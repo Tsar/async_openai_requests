@@ -4,7 +4,7 @@ This is a simple module for making requests to OpenAI (ChatGPT) in asynchronous 
 
 ## Example
 
-This code will print respone to question "How to build a house?" by parts as soon as they are generated:
+This code will print respone to question "_How to build a house?_" by parts as soon as they are generated:
 
 ```python
 import asyncio
