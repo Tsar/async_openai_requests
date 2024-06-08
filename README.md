@@ -14,7 +14,11 @@ API_KEY = '<put your OpenAI API key here>'
 
 async def main():
     messages = [{'role': 'user', 'content': 'How to build a house?'}]
-    responseGenerator = requestChatCompletionStream(messages=messages, gptModel='gpt-4o', apiKey=API_KEY)
+    responseGenerator = requestChatCompletionStream(
+        messages=messages,
+        gptModel='gpt-4o',
+        apiKey=API_KEY,
+    )
     async for responsePart in responseGenerator:
         print(responsePart, end='', flush=True)
     print()
@@ -22,7 +26,7 @@ async def main():
 if __name__ == '__main__':
     asyncio.run(main())
 ```
-See more examples in [example.py](https://github.com/Tsar/async_openai_requests/blob/master/example.py).
+See more examples in [examples.py](https://github.com/Tsar/async_openai_requests/blob/master/examples.py).
 
 ## Features
 
