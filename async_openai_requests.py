@@ -6,8 +6,8 @@ import asyncio
 import aiohttp
 
 t = lambda: time.time()
-ts = lambda: datetime.now().strftime('[%Y-%m-%d %H:%M:%S.%f]')
-log = lambda text: print(f'{ts()} {text}', flush=True)
+ts = lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+log = lambda text: print(f'[{ts()}] {text}', flush=True)
 
 class StatusNot200Exception(Exception):
     def __init__(self, message, status, reason, detailsForLogging=None):
