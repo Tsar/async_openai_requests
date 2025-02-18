@@ -4,10 +4,13 @@ import time
 from datetime import datetime
 import asyncio
 import aiohttp
+import logging
+
+logInfo = lambda text, logger: logger.getChild(__name__).info(text)
+logDebug = lambda text, logger: logger.getChild(__name__).debug(text)
 
 t = lambda: time.time()
 ts = lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-log = lambda text: print(f'[{ts()}] {text}', flush=True)
 
 class StatusNot200Exception(Exception):
     def __init__(self, message, status, reason, detailsForLogging=None):
@@ -51,14 +54,14 @@ async def transcribe(audioData, apiKey, model='whisper-1'):
             result = await resp.json()
             return result['text']
 
-async def requestChatCompletion(messages, gptModel, apiKey, additionalParams=None, usageCallback=None):
+async def requestChatCompletion(messages, gptModel, apiKey, additionalParams=None, usageCallback=None, logger=logging.getLogger("default")):
     request = {
         'model': gptModel,
         'messages': messages,
     }
     if additionalParams is not None:
         request.update(additionalParams)
-    #log(f'Request to {gptModel}: {request}')
+    logDebug(f'Request to {gptModel}: {request}', logger)
     async with aiohttp.ClientSession() as session:
         async with session.post('https://api.openai.com/v1/chat/completions', json=request, headers={'Authorization': f'Bearer {apiKey}'}) as resp:
             if resp.status != 200:
@@ -74,12 +77,12 @@ async def requestChatCompletion(messages, gptModel, apiKey, additionalParams=Non
                     detailsForLogging=errorResult,
                 )
             result = await resp.json()
-            #log(f'Response body from {gptModel}: {result}')
+            logDebug(f'Response body from {gptModel}: {result}', logger)
             if usageCallback is not None:
                 usageCallback(Usage(result['usage']))
             return result['choices'][0]['message']['content']
 
-async def requestChatCompletionStream(messages, gptModel, apiKey, additionalParams=None, usageCallback=None):
+async def requestChatCompletionStream(messages, gptModel, apiKey, additionalParams=None, usageCallback=None, logger=logging.getLogger("default")):
     request = {
         'model': gptModel,
         'messages': messages,
@@ -89,7 +92,7 @@ async def requestChatCompletionStream(messages, gptModel, apiKey, additionalPara
         request.update(additionalParams)
     if usageCallback is not None:
         request.update({'stream_options': {'include_usage': True}})
-    #log(f'Request to {gptModel}: {request}')
+    logDebug(f'Request to {gptModel}: {request}', logger)
     async with aiohttp.ClientSession() as session:
         async with session.post('https://api.openai.com/v1/chat/completions', json=request, headers={'Authorization': f'Bearer {apiKey}'}) as resp:
             contentType = resp.content_type.lower()
@@ -108,7 +111,7 @@ async def requestChatCompletionStream(messages, gptModel, apiKey, additionalPara
             if contentType != 'text/event-stream':
                 raise RuntimeError(f'Expected content type "text/event-stream", but got "{contentType}"')
             async for line in resp.content:
-                #log(f'Got: [{line}]')
+                logDebug(f'Got: [{line}]', logger)
                 line = line.strip()
                 if line == b'':
                     continue
@@ -129,7 +132,7 @@ async def requestChatCompletionStream(messages, gptModel, apiKey, additionalPara
                 else:
                     raise RuntimeError(f'Got some garbage in stream: "{line}"')
 
-async def retryCoroutine(coroutine, *args, maxAttempts=3, sleepBeforeRetry=0.3, **kwargs):
+async def retryCoroutine(coroutine, *args, maxAttempts=3, sleepBeforeRetry=0.3, logger=logging.getLogger("default"), **kwargs):
     allStartTimestamp = t()
     for attempt in range(maxAttempts):
         startTimestamp = t()
@@ -138,7 +141,7 @@ async def retryCoroutine(coroutine, *args, maxAttempts=3, sleepBeforeRetry=0.3, 
             endTimestamp = t()
             elapsed = endTimestamp - startTimestamp
             allElapsed = endTimestamp - allStartTimestamp
-            log(f'{coroutine.__name__} completed in {elapsed:.3f}s' + (f' [all {attempt + 1} attempts took {allElapsed:.3f}s]' if attempt > 0 else ''))
+            logInfo(f'{coroutine.__name__} completed in {elapsed:.3f}s' + (f' [all {attempt + 1} attempts took {allElapsed:.3f}s]' if attempt > 0 else ''), logger)
             return result
         except Exception as ex:
             endTimestamp = t()
@@ -147,7 +150,7 @@ async def retryCoroutine(coroutine, *args, maxAttempts=3, sleepBeforeRetry=0.3, 
                 ex.setAttempts(attempt + 1)
             if attempt == maxAttempts - 1:
                 allElapsed = endTimestamp - allStartTimestamp
-                log(f'All {maxAttempts} attempts to call {coroutine.__name__} failed in {allElapsed:.3f}s, last error: {ex}')
+                logInfo(f'All {maxAttempts} attempts to call {coroutine.__name__} failed in {allElapsed:.3f}s, last error: {ex}', logger)
                 raise ex
-            log(f'Attempt {attempt + 1} to call {coroutine.__name__} failed in {elapsed:.3f}s with error: {ex}')
+            logInfo(f'Attempt {attempt + 1} to call {coroutine.__name__} failed in {elapsed:.3f}s with error: {ex}', logger)
             await asyncio.sleep(sleepBeforeRetry)
